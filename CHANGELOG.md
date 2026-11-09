@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 (2026-11-09)
+
+- **Compact button:** the context meter shows tokens in use, turns amber as a chat grows (400k, or 60 % of a smaller
+  window) and red near Pi's auto-compact point. Click it for plain advice, an optional "keep focus on…" and
+  **Compact now**. While it runs the meter says "Compacting…"; afterwards a divider shows the size before and after
+  (older compactions show the size before), and failures say why. Compactions can take 1–2 minutes, so the window
+  now waits up to 15 minutes for one instead of giving up at 2.
+- **Custom notification per character:** `finish.notify` in a character file replaces the "<Name> finished" title.
+- **Routines edited outside the app show up live:** when an agent or script changes `tasks.json`, the Tasks panel
+  reloads within about 5 seconds (no restart).
+
 ## 0.2.1 (2026-10-31)
 
 Fixes from the post-release review:

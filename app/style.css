@@ -199,6 +199,14 @@ body.swap #hero, body.swap #thread, body.swap #crumb { animation: swapIn .12s ea
 .pill .tag { font-size: 10.5px; color: var(--faint); }
 #ctxMeter { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--faint); padding: 0 6px; }
 #ctxMeter svg { width: 14px; height: 14px; }
+#ctxMeter { cursor: pointer; border-radius: 7px; } #ctxMeter:hover { background: rgba(255,255,255,.06); color: var(--text); }
+#ctxMeter.amber { color: #f0b54a; } #ctxMeter.red { color: #ff6b6b; }
+#ctxMeter.busy { color: var(--text); cursor: progress; } #ctxMeter .spin { width: 10px; height: 10px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ctxspin .8s linear infinite; }
+@keyframes ctxspin { to { transform: rotate(360deg); } }
+.compact-pop { padding: 10px 12px; width: 300px; display: grid; gap: 7px; font-size: 13px; }
+.compact-pop p { margin: 0; line-height: 1.4; } .compact-pop .dim { color: var(--faint); font-size: 12px; }
+.compact-pop .compact-focus { font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: var(--text); }
+.compact-pop .row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 #voiceState { font-size: 12px; color: var(--muted); margin-right: 4px; display: inline-flex; align-items: center; gap: 6px; }
 #voiceState .rec { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 1s infinite; }
 #micBtn.on { color: var(--red); background: rgba(255,107,107,.1); }

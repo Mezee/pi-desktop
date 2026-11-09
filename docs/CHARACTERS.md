@@ -38,7 +38,7 @@ Every field is optional. Restart the app after editing. `characters/_template.js
 | `panel` | `"files"` (default) or `"learning"` (adds Course, Lesson and Profile tabs; see below). |
 | `panelOpen` | Open the side panel the first time this character is picked. |
 | `taskTemplates` | `[{ "name", "schedule", "prompt" }]` routines offered as one-click ideas in the Tasks tab. |
-| `finish` | `{ "sound", "voice", "say", "render" }`: what plays when a reply finishes (below). |
+| `finish` | `{ "sound", "voice", "say", "render", "notify" }`: what plays when a reply finishes, and the notification title (below). |
 | `pinned` | Sorts the character earlier in the menu-bar menu (which lists every character that has a file). |
 | `pinTop` | Always first in the switcher (⌘1), above "in use" and "most used". |
 | `memoryProfile` | Hindsight mental-model id shown in the Memory tab, e.g. `"profile-research"` (only with `config.memory`). |
@@ -91,6 +91,8 @@ When a reply finishes (and the app setting is on), Pi Desktop plays a chime and 
   `sounds/clips/<id>.{chime,voice}.m4a`, which the app plays instead. Tune it with `finish.render` (voice, speed, motif,
   notes, reverb); the header of `sounds/render.py` documents every key.
 - Settings (⌘,) has toggles for the chime and the voice, plus a Preview button.
+- `notify` replaces the notification title "<Name> finished" (and "<Name> · <task> done" for a task that succeeded),
+  e.g. `"notify": "Scout found something"`. Failed tasks keep the standard title.
 
 ## Terminal face (optional)
 

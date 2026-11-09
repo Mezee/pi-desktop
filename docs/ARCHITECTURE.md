@@ -66,6 +66,9 @@ named `⏰ <task>` so its result appears as a normal chat, with a notification a
 the app was closed catches up once on launch if it was due in the last 12 hours. Tasks only run while the app is open:
 turn on "Open at login".
 
+`tasks.json` is checked every 5 seconds: a change the app didn't write (an agent or script adding a routine) is
+reloaded and the Tasks panel refreshes, so routines can be managed outside the window.
+
 ## Security model
 
 The page shows model output, so main.js treats it as untrusted.

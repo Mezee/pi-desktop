@@ -677,7 +677,7 @@ function turnNode(t, isLast) {
       if (m.stopReason === "error" && m.errorMessage) box.append(h("div", { class: "err", title: m.errorMessage }, friendlyError(m.errorMessage)));
       if (m.stopReason === "aborted") box.append(h("div", { class: "divider" }, "Stopped"));
     } else if (m.role === "custom" && m.display) box.append(h("div", { class: "note" }, md(textOf(m.content))));
-    else if (m.role === "compactionSummary") box.append(h("div", { class: "divider" }, "Context compacted"));
+    else if (m.role === "compactionSummary") box.append(h("div", { class: "divider" }, "Context compacted" + (m.tokensAfter ? ` · ${kTok(m.tokensBefore)} → ~${kTok(m.tokensAfter)}` : m.tokensBefore ? ` · was ${kTok(m.tokensBefore)}` : "")));
     else if (m.role === "branchSummary") box.append(h("div", { class: "divider" }, "Branch summary"));
     else if (m.role === "bashExecution") box.append(toolNode({ id: "bx" + m.timestamp, name: "bash", arguments: { command: m.command } }, { content: [{ type: "text", text: m.output }], isError: m.exitCode !== 0 }));
   });
@@ -801,16 +801,54 @@ function tickWorking(reset) {
 async function updateCtx(id = CK()) {
   if (!S.per[id]?.started) return;
   const r = await desk.cmd(id, { type: "get_session_stats" });
-  if (r.success && S.per[id]) { S.per[id].ctx = r.data.contextUsage; if (id === CK()) renderCtx(); }
+  const p = S.per[id]; if (!r.success || !p) return;
+  // Right after a compaction Pi can't know the size until the next reply: show its estimate (~) instead of nothing.
+  const u = r.data.contextUsage;
+  if (u && u.tokens == null && p.ctxAfter) Object.assign(u, { tokens: p.ctxAfter, estimated: true });
+  else if (u?.tokens != null) p.ctxAfter = 0;
+  p.ctx = u; if (id === CK()) renderCtx();
 }
+// Context meter + Compact: amber from 400k (or 60 % of a smaller window), red near Pi's auto-compact point
+// (its default: the window minus 16k reserved for the reply).
+const ctxLevels = (win) => { const auto = win - 16384; return { amber: Math.min(4e5, 0.6 * win), red: 0.9 * auto, auto }; };
+const kTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : Math.round(n / 1e3) + "k");
 function renderCtx() {
-  const c = P().ctx, el = $("#ctxMeter");
+  const p = P(), c = p.ctx, el = $("#ctxMeter");
+  if (p.compacting) { el.className = "busy"; el.title = "Compacting: summarising the older messages (often 1–2 minutes)"; return el.replaceChildren(h("span", { class: "spin" }), "Compacting…"); }
+  el.className = "";
   if (!c || !c.tokens || !c.contextWindow) return el.replaceChildren();
-  const pct = Math.min(1, c.tokens / c.contextWindow);
+  const pct = Math.min(1, c.tokens / c.contextWindow), lv = ctxLevels(c.contextWindow);
   if (pct < 0.01) return el.replaceChildren();
-  el.replaceChildren(svg(ICON.ring(pct)), `${Math.round(pct * 100)}%`);
-  el.title = `${c.tokens.toLocaleString()} / ${c.contextWindow.toLocaleString()} tokens`;
+  el.replaceChildren(svg(ICON.ring(pct)), (c.estimated ? "~" : "") + kTok(c.tokens));
+  el.className = c.tokens >= lv.red ? "red" : c.tokens >= lv.amber ? "amber" : "";
+  el.title = `${c.tokens.toLocaleString()} of ${c.contextWindow.toLocaleString()} tokens. Click to compact.`;
 }
+// Manual compaction: what the summary must keep. Summaries tend to drop the user's working rules first, so ask for them verbatim.
+const COMPACT_KEEP = "Structured sections, not prose. Keep VERBATIM: the goal and every rule or instruction the user gave about how to work. Then: decisions made and why; open problems and bugs; files touched (paths + what changed); commands and test status; what was tried and failed (so it isn't retried); the exact next step.";
+$("#ctxMeter").addEventListener("click", (e) => {
+  const id = CK(), p = P(id), c = p.ctx, anchor = e.currentTarget;
+  if (p.compacting) return toast("Still compacting: it says here when it's done");
+  if (!c?.tokens) return;
+  const lv = ctxLevels(c.contextWindow);
+  popover(anchor, (pop) => {
+    const focus = h("input", { class: "compact-focus", placeholder: "Keep focus on… (optional)" });
+    const go = h("button", { class: "btn primary", disabled: p.streaming, onclick: async () => {
+      closePopover(); await live(id);
+      // Pi's compaction events show what happens (meter, toasts, the divider); this only reports a compaction that never started.
+      p.compactSeen = false;
+      const f = focus.value.trim(), r = await desk.cmd(id, { type: "compact", customInstructions: COMPACT_KEEP + (f ? ` Focus especially on: ${f}` : "") });
+      if (!r.success && !p.compactSeen && r.error !== "timeout") toast("Couldn't compact: " + (r.error || "unknown error"), "warning");
+    } }, "Compact now");
+    focus.addEventListener("keydown", (k) => { if (k.key === "Enter" && !go.disabled) go.click(); });
+    pop.append(h("div", { class: "compact-pop" },
+      h("b", {}, `${kTok(c.tokens)} of ${kTok(c.contextWindow)} in use`),
+      h("p", {}, c.tokens >= lv.amber ? "Big chat: agents tend to make more mistakes as the context grows. Compact at a natural break (a task done, after a commit)."
+        : "Plenty of room. Compact at a natural break if the chat changes topic."),
+      h("p", { class: "dim" }, `Pi compacts by itself at about ${kTok(lv.auto)}. Compacting summarises older messages and keeps the most recent ones word for word.`),
+      focus, h("div", { class: "row" }, p.streaming ? h("span", { class: "dim" }, "Wait for the reply to finish") : null, go)));
+    setTimeout(() => focus.focus(), 0);
+  }, { key: "ctx", cls: "compact-menu" });
+});
 
 // Turns the provider's raw error into what happened and what to do. The original text stays in the tooltip.
 function friendlyError(raw) {
@@ -876,7 +914,21 @@ function onEvent(id, ev) {
     case "queue_update": p.queue = { steering: ev.steering || [], followUp: ev.followUp || [] }; if (active) renderDock(); break;
     case "session_info_changed": p.sessionName = ev.name || ""; if (active) renderCrumb(); refreshThreads(p.harness); break;
     case "thinking_level_changed": p.thinking = ev.level; if (active) renderDock(); break;
-    case "compaction_start": if (active) toast("Compacting context…"); break;
+    case "compaction_start":
+      p.compacting = ev.reason || "manual"; p.compactSeen = true;
+      if (active) { toast(ev.reason === "threshold" ? "Context hit the auto-compact point: compacting…" : "Compacting context… (often 1–2 minutes)"); renderCtx(); }
+      break;
+    case "compaction_end":
+      p.compacting = null;
+      if (ev.result) {
+        // The divider (with the numbers) shows it happened right where the chat is; the older messages stay on screen.
+        p.ctxAfter = ev.result.estimatedTokensAfter || 0;
+        p.msgs.push({ role: "compactionSummary", summary: ev.result.summary || "", timestamp: Date.now(), tokensBefore: ev.result.tokensBefore, tokensAfter: ev.result.estimatedTokensAfter });
+        if (active) { toast(`Compacted: ${kTok(ev.result.tokensBefore)} → ~${kTok(ev.result.estimatedTokensAfter || 0)}`); scheduleRender(); }
+      } else if (ev.errorMessage) { if (active) toast(ev.errorMessage.replace(/^Compaction failed: /, "Couldn't compact: "), "warning"); }
+      else if (ev.aborted && active) toast("Compaction stopped; nothing was changed", "warning");
+      if (active) renderCtx();
+      updateCtx(id); break;
     case "extension_error": console.warn("extension_error", ev); break;
     case "extension_ui_request": onUiRequest(id, ev); break;
   }

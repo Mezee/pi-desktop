@@ -15,9 +15,9 @@ and `AGENTS.md`), so nothing about how your agents work changes. You just get a 
   steer a reply mid-stream (Enter), stop (Esc). Several chats run side by side, even across characters.
 - **Chat management**: pin, rename, archive, search (titles and what you wrote), export to HTML, copy as Markdown, delete to Trash.
   Edit a message or regenerate a reply: both branch with Pi's fork, so the original stays intact.
-- **Model + thinking pickers** per chat, a context meter, `/` command menu, extension dialogs (`select`, `confirm`, `input`).
+- **Model + thinking pickers** per chat, a context meter (amber/red as a chat grows; click it to **Compact** with an optional focus), `/` command menu, extension dialogs (`select`, `confirm`, `input`).
 - **Tasks**: scheduled prompts per character (daily, weekdays, weekly, every N hours). Each run is a separate headless
-  Pi run, saved as a chat, with a notification.
+  Pi run, saved as a chat, with a notification. Tasks an agent or script writes into `tasks.json` appear within seconds.
 - **Finish sounds**: a chime and a spoken line per character ("Scout has findings.") when a reply lands.
 - **Voice typing**, transcribed locally with whisper.cpp (⌘⇧D), with your characters' names as vocabulary. Pick the
   microphone in Settings or right-click the mic button. No audio leaves your Mac.

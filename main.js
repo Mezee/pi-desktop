@@ -211,7 +211,7 @@ function onSettled(key) {
   const harness = procs.get(key)?.harness, ch = charById(harness);
   rpc(key, { type: "get_last_assistant_text" }, 5000).then((r) => {
     const body = (r?.data?.text || "Done.").replace(/\s+/g, " ").slice(0, 140);
-    const n = new Notification({ title: `${ch?.name || harness} finished`, body, silent: false });
+    const n = new Notification({ title: ch?.finish?.notify || `${ch?.name || harness} finished`, body, silent: false });
     n.on("click", () => { showWindow(); send("app:focus-chat", { harness, key }); });
     n.show();
   });
@@ -406,7 +406,7 @@ async function chatHistory(file) {
   for (const e of chain.reverse()) {
     if (e.type === "message" && e.message && e.message.role !== "system") messages.push(e.message);
     else if (e.type === "custom_message") messages.push({ role: "custom", customType: e.customType, content: e.content, display: e.display, timestamp: Date.parse(e.timestamp) });
-    else if (e.type === "compaction") messages.push({ role: "compactionSummary", summary: e.summary, timestamp: Date.parse(e.timestamp) });
+    else if (e.type === "compaction") messages.push({ role: "compactionSummary", summary: e.summary, timestamp: Date.parse(e.timestamp), tokensBefore: e.tokensBefore });
     else if (e.type === "branch_summary") messages.push({ role: "branchSummary", summary: e.summary, timestamp: Date.parse(e.timestamp) });
   }
   historyCache.set(file, { sig, messages });
@@ -510,6 +510,19 @@ let tasks = readJSON(TASKS_PATH, []);
 const runningTasks = new Map();
 const saveTasks = () => { fs.writeFileSync(TASKS_PATH, JSON.stringify(tasks, null, 2)); send("tasks:update", publicTasks()); };
 const publicTasks = () => tasks.map((t) => ({ ...t, running: runningTasks.has(t.id) }));
+// Routines added or edited outside the app (by an agent, a script, or by hand) show up live: when tasks.json changes
+// on disk and differs from what the app last wrote, reload it and refresh the panel.
+let tasksSeenOnDisk = null;
+setInterval(() => {
+  let onDisk;
+  try { onDisk = fs.readFileSync(TASKS_PATH, "utf8"); } catch { return; }
+  if (onDisk === tasksSeenOnDisk) return;
+  tasksSeenOnDisk = onDisk;
+  const next = core.tasksFromDisk(onDisk, JSON.stringify(tasks, null, 2));
+  if (!next) return;
+  tasks = next;
+  send("tasks:update", publicTasks());
+}, 5000).unref?.();
 
 const nextRun = (t, from = Date.now()) => core.nextRun(t.schedule, from);
 
@@ -545,7 +558,7 @@ function runTask(id) {
     t.runs = [run, ...(t.runs || [])].slice(0, 20);
     t.lastRunAt = started;
     saveTasks();
-    const n = new Notification({ title: `${ch.name} · ${t.name} ${ok ? "done" : "failed"}`, body: summary.replace(/\s+/g, " ").slice(0, 140) || (ok ? "Done." : `Exit ${code}`) });
+    const n = new Notification({ title: ok && ch.finish?.notify ? ch.finish.notify : `${ch.name} · ${t.name} ${ok ? "done" : "failed"}`, body: summary.replace(/\s+/g, " ").slice(0, 140) || (ok ? "Done." : `Exit ${code}`) });
     n.on("click", () => { showWindow(); send("app:open-task", { character: t.character, id: t.id }); });
     n.show();
   });
@@ -802,7 +815,7 @@ ipcMain.handle("pi:cmd", (_e, id, cmd) => {
     if (!core.exportPathAllowed(out, HOME)) return { success: false, error: "Export goes to an .html file in Downloads." };
     cmd = { ...cmd, outputPath: out };
   }
-  return rpc(id, cmd);
+  return rpc(id, cmd, cmd.type === "compact" ? 15 * 60e3 : undefined); // summarising a big chat takes 1–2+ minutes
 });
 ipcMain.handle("pi:ensure", async (_e, key, harness, sessionFile) => {
   // Another chat already has this file running: share its process instead of starting a second writer.

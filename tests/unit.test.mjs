@@ -158,3 +158,17 @@ test("secret and launch lists cover the review's gaps", () => {
     assert.ok(!core.allowedPath(`${HOME}/${p}`, HOME), p);
   for (const f of ["/a/run.py", "/a/x.shortcut", "/a/x.afploc", "/a/x.saver"]) assert.ok(core.LAUNCHES.test(f), f);
 });
+
+test("pageRpcAllowed: the Compact button's RPC is allowed; bash still isn't", () => {
+  assert.equal(core.pageRpcAllowed({ type: "compact", customInstructions: "keep the goal" }), true);
+  assert.equal(core.pageRpcAllowed({ type: "bash", command: "ls" }), false);
+});
+
+test("tasksFromDisk: outside edits reload; the app's own write, broken JSON and non-lists don't", () => {
+  const mine = JSON.stringify([{ id: "a", name: "A" }], null, 2);
+  assert.equal(core.tasksFromDisk(mine, mine), null);
+  assert.equal(core.tasksFromDisk('[{"id": "a", "na', mine), null);
+  assert.equal(core.tasksFromDisk('{"id": "a"}', mine), null);
+  assert.deepEqual(core.tasksFromDisk('[{"id": "a"}, {"id": "b", "name": "B"}]', mine), [{ id: "a" }, { id: "b", name: "B" }]);
+  assert.deepEqual(core.tasksFromDisk('[{"id": "a"}, {"name": "no id"}, null, "x", {"id": ""}]', mine), [{ id: "a" }]);
+});
